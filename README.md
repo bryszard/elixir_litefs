@@ -104,7 +104,20 @@ defmodule MyApp.Application do
 end
 ```
 
-And dev.exs / runtime.exs need to be configured appropriately.
+Sqlite journal mode needs to be changed to :delete as litefs does not support WAL atm.
+
+``` elixir
+
+config :my_app, MyApp.Repo.Local,
+  database: "/mnt/litefs1/test.db",
+  journal_mode: :delete,
+  pool_size: 5,
+  stacktrace: true
+
+```
+
+
+Libcluster needs to be configured appropriately for dev.exs / runtime.exs.
 
 ```elixir
 config :libcluster,
