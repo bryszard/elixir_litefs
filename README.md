@@ -91,7 +91,7 @@ defmodule MyApp.Application do
     topologies = Application.get_env(:libcluster, :topologies) || []
     children = [
       # Start litefs genserver and pass the local repo configuration
-      {Litefs, Application.get_env(:my_app, LitefsLiveview.Repo.Local)},
+      {Litefs, Application.get_env(:my_app, MyApp.Repo.Local)},
       # Start the Ecto repository
       MyApp.Repo.Local,
       # setup libcluster
