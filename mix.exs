@@ -47,8 +47,9 @@ defmodule Litefs.MixProject do
   defp package do
     [
       files: ["lib", "mix.exs", "README*", "LICENSE*"],
-      maintainers: ["Mark Ericksen"],
-      licenses: ["Apache-2.0"]
+      maintainers: ["TJ"],
+      licenses: ["Apache-2.0"],
+      links: %{"SourceHut" => "https://git.sr.ht/~sheertj/elixir_litefs"}
     ]
   end
 end
