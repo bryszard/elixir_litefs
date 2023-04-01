@@ -27,7 +27,7 @@ defmodule Litefs do
 
   @tab :litefs
   @primary_check_time 30_000
-  @verbose_log false
+  @verbose_log true
 
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
