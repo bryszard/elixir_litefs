@@ -35,6 +35,7 @@ defmodule Litefs do
 
   def init(opts) do
     _tab = :ets.new(@tab, [:named_table, :public, read_concurrency: true])
+    IO.inspect "INITIALIZING LITEFS"
 
     primary_file_path =
       opts
@@ -54,9 +55,16 @@ defmodule Litefs do
   end
 
   def get(key) do
-    case :ets.lookup(@tab, key) do
-      [{^key, value}] -> value
-      [] -> nil
+    IO.inspect "IS LITEFS TABLE SET?"
+    IO.inspect(:ets.whereis :foo)
+    IO.inspect "DONE"
+    if :ets.whereis(@tab) == :undefined do
+      nil
+    else
+      case :ets.lookup(@tab, key) do
+        [{^key, value}] -> value
+        [] -> nil
+      end
     end
   end
 
