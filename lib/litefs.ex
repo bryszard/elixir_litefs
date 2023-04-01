@@ -28,6 +28,9 @@ defmodule Litefs do
   @tab :litefs
   @primary_check_time 30_000
   @verbose_log false
+  @ets_key_primary_file :primary_file
+  @ets_key_position_file :position_file
+  @ets_key_primary_node :primary_node
 
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
@@ -36,13 +39,13 @@ defmodule Litefs do
   def init(opts) do
     _tab = :ets.new(@tab, [:named_table, :public, read_concurrency: true])
 
-    primary_file_path =
-      opts
-      |> Keyword.get(:database)
-      |> Path.dirname()
+    database_path = Keyword.get(opts, :database)
+    database_dir = Path.dirname(database_path)
+    database_position_file = "#{database_path}-pos"
+    database_primary_file = "#{database_dir}/.primary"
 
-    primary_file_path = primary_file_path <> "/.primary"
-    set_primary_path(primary_file_path)
+    set(@ets_key_primary_file, database_primary_file)
+    set(@ets_key_position_file, database_position_file)
 
     # monitor new node up/down activity
     :global_group.monitor_nodes(true)
@@ -64,25 +67,21 @@ defmodule Litefs do
     end
   end
 
-  def set_primary_path(t), do: set(:path, t)
-  def get_primary_path(), do: get(:path)
-  def set_primary(name), do: set(:primary, name)
-  def get_primary() do
-    primary = get(:primary)
-    if is_nil(primary) do
-      raise "No primary found!"
-    end
-    primary
-  end
-
   def check_for_litefs_primary_file() do
-    File.exists?(get_primary_path())
+    primary_file_path = get(@ets_key_primary_file)
+    # We don't know where the database is mounted.
+    if is_nil(primary_file_path) do
+      Logger.error("Litefs #{Node.self()}: has no database path set in ETS.")
+      false
+    else
+      File.exists?(primary_file_path)
+    end
   end
 
   def update_primary() do
-    primary_file_path = get_primary_path()
+    primary_file_path = get(@ets_key_primary_file)
 
-    primary_node =
+    updated_primary_node =
       if !is_nil(primary_file_path) && !File.exists?(primary_file_path) do
         Node.self()
       else
@@ -95,9 +94,14 @@ defmodule Litefs do
         end)
       end
 
-    set_primary(primary_node)
+    # Check if the primary_node has changed
+    original_primary_node = get(@ets_key_primary_node)
+    if original_primary_node != updated_primary_node  do
+      Logger.info("Litefs #{Node.self()}: primary node changed from #{original_primary_node} to #{updated_primary_node}")
+      set(@ets_key_primary_node, updated_primary_node)
+    end
 
-    if !is_nil(primary_node), do: :ok, else: :error
+    if !is_nil(updated_primary_node), do: :ok, else: :error
   end
 
   def handle_continue(:update_primary, state) do
@@ -133,8 +137,19 @@ defmodule Litefs do
   def rpc(node, module, func, args, timeout \\ 5000)
 
   def rpc(:primary, module, func, args, timeout) do
-    rpc(get_primary(), module, func, args, timeout)
+    primary_node = get(@ets_key_primary_node)
+    if is_nil(primary_node) do
+      raise "No primary found!"
+    end
+    rpc(primary_node, module, func, args, timeout)
   end
+
+  # def rpc_and_wait(:primary, module, func, args, timeout) do
+  #   primary_node = get(@ets_key_primary_node)
+  #   if is_nil(primary_node) do
+  #     raise "No primary found!"
+  #   end
+  # end
 
   def rpc(node, module, func, args, timeout) do
     verbose_log(:info, fn ->
