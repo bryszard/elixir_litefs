@@ -376,7 +376,7 @@ defmodule Litefs.Repo do
 
         primary_node = Litefs.get_primary!()
 
-        if Litefs.get_primary() == Node.self() do
+        if primary_node == Node.self() do
           __exec_local__(func, args)
         else
           Litefs.rpc(primary_node, @local_repo, func, args)
