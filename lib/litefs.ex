@@ -54,9 +54,13 @@ defmodule Litefs do
   end
 
   def get(key) do
-    case :ets.lookup(@tab, key) do
-      [{^key, value}] -> value
-      [] -> nil
+    if :ets.whereis(@tab) == :undefined do
+      nil
+    else
+      case :ets.lookup(@tab, key) do
+        [{^key, value}] -> value
+        [] -> nil
+      end
     end
   end
 
@@ -79,7 +83,7 @@ defmodule Litefs do
     primary_file_path = get_primary_path()
 
     primary_node =
-      if !File.exists?(primary_file_path) do
+      if !is_nil(primary_file_path) && !File.exists?(primary_file_path) do
         Node.self()
       else
         Enum.reduce_while(Node.list(), nil, fn x, acc ->
