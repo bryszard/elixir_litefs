@@ -374,7 +374,7 @@ defmodule Litefs.Repo do
       def __exec_on_primary__(func, args, opts) do
         # TODO - implement an rpc_and_wait for making sure replication happens
 
-        primary_node = Litefs.get_primary()
+        primary_node = Litefs.get_primary!()
 
         if Litefs.get_primary() == Node.self() do
           __exec_local__(func, args)

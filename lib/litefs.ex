@@ -78,6 +78,14 @@ defmodule Litefs do
     end
   end
 
+  def get_primary!() do
+    primary_node = get(@ets_key_primary_node)
+    if is_nil(primary_node) do
+      raise "No primary found!"
+    end
+    primary_node
+  end
+
   def update_primary() do
     primary_file_path = get(@ets_key_primary_file)
 
@@ -137,10 +145,7 @@ defmodule Litefs do
   def rpc(node, module, func, args, timeout \\ 5000)
 
   def rpc(:primary, module, func, args, timeout) do
-    primary_node = get(@ets_key_primary_node)
-    if is_nil(primary_node) do
-      raise "No primary found!"
-    end
+    primary_node = get_primary!()
     rpc(primary_node, module, func, args, timeout)
   end
 
