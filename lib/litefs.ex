@@ -180,37 +180,47 @@ defmodule Litefs do
     end
   end
 
-  # def rpc_and_wait(:primary, module, func, args, timeout) do
-  #   primary_node = get_primary!()
-  #   rpc_and_wait(primary_node, module, func, args, timeout)
-  # end
+  def rpc_and_wait(:primary, module, func, args, timeout \\ 5000) do
+    primary_node = get_primary!()
+    position_file = get(@ets_key_position_file)
+    transaction_id = get_transaction_id(position_file)
 
-  # def rpc_and_wait(node, module, func, args, timeout) do
-  #   rpc_timeout = Keyword.get(opts, :rpc_timeout, 5_000)
-  #   start_time = System.os_time(:millisecond)
+    result = rpc(primary_node, module, func, args)
 
-  #   {lsn_value, result} =
-  #     Fly.RPC.rpc_region(:primary, __MODULE__, :__rpc_lsn__, [module, func, args, opts],
-  #       timeout: rpc_timeout
-  #     )
+    # We don't know what the new transaction number should be, but it
+    # whatever it is, it should be incremented.
+    wait_for_next_transaction_id(position_file, transaction_id, System.monotonic_time(), timeout, 0)
 
-  #   case Fly.Postgres.LSN.Tracker.request_and_await_notification(lsn_value, opts) do
-  #     :ready ->
-  #       verbose_remote_log(:info, fn ->
-  #         "LSN TOTAL rpc_and_wait: #{inspect(System.os_time(:millisecond) - start_time)}msec"
-  #       end)
+    result
+  end
 
-  #       result
+  defp get_transaction_id(position_file) do
+    [ transaction_id, _transaction_hash] = File.read!(position_file) |> String.trim |> String.split("/")
+    # If this is unparsable, something bad happenned and just crash.
+    { transaction_number, "" } = Integer.parse(transaction_id, 16)
+    transaction_number
+  end
 
-  #     {:error, :timeout} ->
-  #       Logger.error(
-  #         "LSN RPC notification timeout calling #{Fly.mfa_string(module, func, args)}}"
-  #       )
+  defp wait_for_next_transaction_id(position_file, id, start_time, timeout, retry_count) do
+    cond do
+      (System.monotonic_time() - start_time) / 1_000_000 > timeout ->
+        Logger.error("Litefs #{Node.self()} - replication timed out waiting for next transaction_id")
+        false
+      get_transaction_id(position_file) > id ->
+        true
+      true ->
+        backoff_time = backoff(retry_count)
+        :timer.sleep(backoff_time)
+        wait_for_next_transaction_id(position_file, id, start_time, timeout, retry_count + 1)
+    end
+  end
 
-  #       exit(:timeout)
-  #   end
-  # end
-
+  defp backoff(retry_count) do
+    base = 20
+    cap = 1000
+    x = min(cap, base * :math.pow(2, retry_count)) |> round
+    Enum.random(1..min(cap, x))
+  end
 
   @doc false
   # Private function that can be executed on a remote node in the cluster. Used

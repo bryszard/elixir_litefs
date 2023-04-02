@@ -380,13 +380,8 @@ defmodule Litefs.Repo do
             __exec_local__(func, args)
 
           Keyword.get(opts, :await, true) ->
-            rpc_timeout = Keyword.get(opts, :rpc_timeout, @timeout)
-            replication_timeout = Keyword.get(opts, :replication_timeout, @replication_timeout)
+            Litefs.rpc_and_wait(:primary, @local_repo, func, args)
 
-            Litefs.rpc_and_wait(primary_node, @local_repo, func, args,
-              rpc_timeout: rpc_timeout,
-              replication_timeout: replication_timeout
-            )
           true ->
             Litefs.rpc(primary_node, @local_repo, func, args)
         end
