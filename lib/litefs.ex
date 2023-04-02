@@ -149,13 +149,6 @@ defmodule Litefs do
     rpc(primary_node, module, func, args, timeout)
   end
 
-  # def rpc_and_wait(:primary, module, func, args, timeout) do
-  #   primary_node = get(@ets_key_primary_node)
-  #   if is_nil(primary_node) do
-  #     raise "No primary found!"
-  #   end
-  # end
-
   def rpc(node, module, func, args, timeout) do
     verbose_log(:info, fn ->
       "RPC REQ from #{Node.self()} to #{node}: #{mfa_string(module, func, args)}"
@@ -186,6 +179,38 @@ defmodule Litefs do
         exit(:timeout)
     end
   end
+
+  # def rpc_and_wait(:primary, module, func, args, timeout) do
+  #   primary_node = get_primary!()
+  #   rpc_and_wait(primary_node, module, func, args, timeout)
+  # end
+
+  # def rpc_and_wait(node, module, func, args, timeout) do
+  #   rpc_timeout = Keyword.get(opts, :rpc_timeout, 5_000)
+  #   start_time = System.os_time(:millisecond)
+
+  #   {lsn_value, result} =
+  #     Fly.RPC.rpc_region(:primary, __MODULE__, :__rpc_lsn__, [module, func, args, opts],
+  #       timeout: rpc_timeout
+  #     )
+
+  #   case Fly.Postgres.LSN.Tracker.request_and_await_notification(lsn_value, opts) do
+  #     :ready ->
+  #       verbose_remote_log(:info, fn ->
+  #         "LSN TOTAL rpc_and_wait: #{inspect(System.os_time(:millisecond) - start_time)}msec"
+  #       end)
+
+  #       result
+
+  #     {:error, :timeout} ->
+  #       Logger.error(
+  #         "LSN RPC notification timeout calling #{Fly.mfa_string(module, func, args)}}"
+  #       )
+
+  #       exit(:timeout)
+  #   end
+  # end
+
 
   @doc false
   # Private function that can be executed on a remote node in the cluster. Used

@@ -373,13 +373,22 @@ defmodule Litefs.Repo do
 
       def __exec_on_primary__(func, args, opts) do
         # TODO - implement an rpc_and_wait for making sure replication happens
-
         primary_node = Litefs.get_primary!()
 
-        if primary_node == Node.self() do
-          __exec_local__(func, args)
-        else
-          Litefs.rpc(primary_node, @local_repo, func, args)
+        cond do
+          primary_node == Node.self() ->
+            __exec_local__(func, args)
+
+          Keyword.get(opts, :await, true) ->
+            rpc_timeout = Keyword.get(opts, :rpc_timeout, @timeout)
+            replication_timeout = Keyword.get(opts, :replication_timeout, @replication_timeout)
+
+            Litefs.rpc_and_wait(primary_node, @local_repo, func, args,
+              rpc_timeout: rpc_timeout,
+              replication_timeout: replication_timeout
+            )
+          true ->
+            Litefs.rpc(primary_node, @local_repo, func, args)
         end
       end
     end
