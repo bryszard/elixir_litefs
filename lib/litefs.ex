@@ -191,13 +191,14 @@ defmodule Litefs do
 
     result = rpc(primary_node, module, func, args)
 
-    # It could be the case that we execute a command that results in no changes.
-    # If there are no changes, we have to check the transaction_id on the primary
-    # before waiting for the next transaction id
-
     # TODO: Could possibly change __local_rpc__ to also return the transaction_id
     # Would still need to roughly wait the same time with replication though
     # making this slightly more chatty.
+    #
+    # But it could be the case that we execute a command that results in no changes.
+    # If there are no changes, we have to check the transaction_id on the primary
+    # before waiting for the next transaction id, which would be faster for that case.
+
 
     primary_transaction_id = rpc(:primary, __MODULE__, :get_transaction_id, [])
     if primary_transaction_id != local_transaction_id do
