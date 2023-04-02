@@ -152,6 +152,7 @@ defmodule Litefs do
   end
 
   def rpc(node, module, func, args, timeout) do
+    start_time = System.monotonic_time()
     verbose_log(:info, fn ->
       "RPC REQ from #{Node.self()} to #{node}: #{mfa_string(module, func, args)}"
     end)
@@ -171,12 +172,16 @@ defmodule Litefs do
           "RPC RECV response from #{node} to #{Node.self()}: #{mfa_string(module, func, args)}"
         end)
 
+        Logger.info("RPC #{mfa_string(module, func, args)} took #{(System.monotonic_time() - start_time ) / 1_000_000}")
+
         result
     after
       timeout ->
         verbose_log(:error, fn ->
           "RPC TIMEOUT from #{node} to #{Node.self}: #{mfa_string(module, func, args)}"
         end)
+
+        Logger.error("RPC TIMEOUT #{mfa_string(module, func, args)} took #{(System.monotonic_time() - start_time ) / 1_000_000}")
 
         exit(:timeout)
     end
@@ -212,7 +217,7 @@ defmodule Litefs do
   end
 
   def wait_for_next_transaction_id(id, start_time, timeout, retry_count) do
-    Logger.info("Litefs #{Node.self()} - waiting for replication #{id} for #{(System.monotonic_time() - start_time ) / 1_000_000}")
+    #Logger.info("Litefs #{Node.self()} - waiting for replication #{id} for #{(System.monotonic_time() - start_time ) / 1_000_000}")
     cond do
       (System.monotonic_time() - start_time) / 1_000_000 > timeout ->
         Logger.error("Litefs #{Node.self()} - replication timed out on #{id}")
