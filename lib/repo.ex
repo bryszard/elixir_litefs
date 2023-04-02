@@ -375,14 +375,21 @@ defmodule Litefs.Repo do
         # TODO - implement an rpc_and_wait for making sure replication happens
         primary_node = Litefs.get_primary!()
 
+        IO.inspect "HERE"
+        IO.inspect "on #{Node.self()} - primary is #{primary_node}"
+        IO.inspect "await is #{Keyword.get(opts, :await, true)}"
+        IO.inspect "DONE"
+
         cond do
           primary_node == Node.self() ->
             __exec_local__(func, args)
 
           Keyword.get(opts, :await, true) ->
+            IO.inspect "IN RPC_AND_WAIT"
             Litefs.rpc_and_wait(:primary, @local_repo, func, args)
 
           true ->
+            IO.inspect "IN RPC_NORMAL"
             Litefs.rpc(primary_node, @local_repo, func, args)
         end
       end

@@ -194,14 +194,14 @@ defmodule Litefs do
     result
   end
 
-  defp get_transaction_id(position_file) do
+  def get_transaction_id(position_file) do
     [ transaction_id, _transaction_hash] = File.read!(position_file) |> String.trim |> String.split("/")
     # If this is unparsable, something bad happenned and just crash.
     { transaction_number, "" } = Integer.parse(transaction_id, 16)
     transaction_number
   end
 
-  defp wait_for_next_transaction_id(position_file, id, start_time, timeout, retry_count) do
+  def wait_for_next_transaction_id(position_file, id, start_time, timeout, retry_count) do
     Logger.info("Litefs #{Node.self()} - waiting for next transaction_id - #{start_time} - #{id}")
     cond do
       (System.monotonic_time() - start_time) / 1_000_000 > timeout ->
@@ -216,7 +216,7 @@ defmodule Litefs do
     end
   end
 
-  defp backoff(retry_count) do
+  def backoff(retry_count) do
     base = 20
     cap = 1000
     x = min(cap, base * :math.pow(2, retry_count)) |> round
