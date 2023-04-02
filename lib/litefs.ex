@@ -202,6 +202,7 @@ defmodule Litefs do
   end
 
   defp wait_for_next_transaction_id(position_file, id, start_time, timeout, retry_count) do
+    Logger.info("Litefs #{Node.self()} - waiting for next transaction_id - #{start_time} - #{id}")
     cond do
       (System.monotonic_time() - start_time) / 1_000_000 > timeout ->
         Logger.error("Litefs #{Node.self()} - replication timed out waiting for next transaction_id")
