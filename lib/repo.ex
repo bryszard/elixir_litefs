@@ -372,14 +372,20 @@ defmodule Litefs.Repo do
       end
 
       def __exec_on_primary__(func, args, opts) do
-        # TODO - implement an rpc_and_wait for making sure replication happens
+        primary_node = Litefs.get_primary!()
 
-        primary_node = Litefs.get_primary()
+        cond do
+          primary_node == Node.self() ->
+            #Logger.debug("__exec_on_primary__ - primary_branch")
+            __exec_local__(func, args)
 
-        if Litefs.get_primary() == Node.self() do
-          __exec_local__(func, args)
-        else
-          Litefs.rpc(primary_node, @local_repo, func, args)
+          Keyword.get(opts, :await, true) ->
+            #Logger.debug("__exec_on_primary__ - rpc_and_wait branch")
+            Litefs.rpc_and_wait(:primary, @local_repo, func, args)
+
+          true ->
+            #Logger.debug("__exec_on_primary__ - rpc_no_wait branch")
+            Litefs.rpc(primary_node, @local_repo, func, args)
         end
       end
     end

@@ -28,6 +28,9 @@ defmodule Litefs do
   @tab :litefs
   @primary_check_time 30_000
   @verbose_log false
+  @ets_key_primary_file :primary_file
+  @ets_key_position_file :position_file
+  @ets_key_primary_node :primary_node
 
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
@@ -36,13 +39,13 @@ defmodule Litefs do
   def init(opts) do
     _tab = :ets.new(@tab, [:named_table, :public, read_concurrency: true])
 
-    primary_file_path =
-      opts
-      |> Keyword.get(:database)
-      |> Path.dirname()
+    database_path = Keyword.get(opts, :database)
+    database_dir = Path.dirname(database_path)
+    database_position_file = "#{database_path}-pos"
+    database_primary_file = "#{database_dir}/.primary"
 
-    primary_file_path = primary_file_path <> "/.primary"
-    set_primary_path(primary_file_path)
+    set(@ets_key_primary_file, database_primary_file)
+    set(@ets_key_position_file, database_position_file)
 
     # monitor new node up/down activity
     :global_group.monitor_nodes(true)
@@ -64,25 +67,29 @@ defmodule Litefs do
     end
   end
 
-  def set_primary_path(t), do: set(:path, t)
-  def get_primary_path(), do: get(:path)
-  def set_primary(name), do: set(:primary, name)
-  def get_primary() do
-    primary = get(:primary)
-    if is_nil(primary) do
-      raise "No primary found!"
+  def check_for_litefs_primary_file() do
+    primary_file_path = get(@ets_key_primary_file)
+    # We don't know where the database is mounted.
+    if is_nil(primary_file_path) do
+      Logger.error("Litefs #{Node.self()}: has no database path set in ETS.")
+      false
+    else
+      File.exists?(primary_file_path)
     end
-    primary
   end
 
-  def check_for_litefs_primary_file() do
-    File.exists?(get_primary_path())
+  def get_primary!() do
+    primary_node = get(@ets_key_primary_node)
+    if is_nil(primary_node) do
+      raise "No primary found!"
+    end
+    primary_node
   end
 
   def update_primary() do
-    primary_file_path = get_primary_path()
+    primary_file_path = get(@ets_key_primary_file)
 
-    primary_node =
+    updated_primary_node =
       if !is_nil(primary_file_path) && !File.exists?(primary_file_path) do
         Node.self()
       else
@@ -95,9 +102,14 @@ defmodule Litefs do
         end)
       end
 
-    set_primary(primary_node)
+    # Check if the primary_node has changed
+    original_primary_node = get(@ets_key_primary_node)
+    if original_primary_node != updated_primary_node  do
+      Logger.info("Litefs #{Node.self()}: primary node changed from #{original_primary_node} to #{updated_primary_node}")
+      set(@ets_key_primary_node, updated_primary_node)
+    end
 
-    if !is_nil(primary_node), do: :ok, else: :error
+    if !is_nil(updated_primary_node), do: :ok, else: :error
   end
 
   def handle_continue(:update_primary, state) do
@@ -127,16 +139,20 @@ defmodule Litefs do
   @doc """
   Executes the function on the remote node and waits for the response.
 
+  iex> Litefs.rpc(:primary, Litefs, :get_transaction_id, [])
+
   Exits after `timeout` milliseconds.
   """
   @spec rpc(node, module, func :: atom(), args :: [any], non_neg_integer()) :: any()
   def rpc(node, module, func, args, timeout \\ 5000)
 
   def rpc(:primary, module, func, args, timeout) do
-    rpc(get_primary(), module, func, args, timeout)
+    primary_node = get_primary!()
+    rpc(primary_node, module, func, args, timeout)
   end
 
   def rpc(node, module, func, args, timeout) do
+    start_time = System.monotonic_time()
     verbose_log(:info, fn ->
       "RPC REQ from #{Node.self()} to #{node}: #{mfa_string(module, func, args)}"
     end)
@@ -153,18 +169,71 @@ defmodule Litefs do
     receive do
       {^ref, result} ->
         verbose_log(:info, fn ->
-          "RPC RECV response from #{node} to #{Node.self()}: #{mfa_string(module, func, args)}"
+          "RPC RECV response from #{node} to #{Node.self()}: #{mfa_string(module, func, args)} took #{(System.monotonic_time() - start_time ) / 1_000_000}"
         end)
 
         result
     after
       timeout ->
-        verbose_log(:error, fn ->
-          "RPC TIMEOUT from #{node} to #{Node.self}: #{mfa_string(module, func, args)}"
-        end)
+        # verbose_log(:error, fn ->
+        #   "RPC TIMEOUT from #{node} to #{Node.self}: #{mfa_string(module, func, args)}"
+        # end)
+
+        Logger.error("RPC TIMEOUT from #{node} to #{Node.self}: #{mfa_string(module, func, args)} took #{(System.monotonic_time() - start_time ) / 1_000_000}")
 
         exit(:timeout)
     end
+  end
+
+  def rpc_and_wait(:primary, module, func, args, timeout \\ 5000) do
+    primary_node = get_primary!()
+    local_transaction_id = get_transaction_id()
+
+    result = rpc(primary_node, module, func, args)
+
+    # It could be the case that we execute a command that results in no changes.
+    # If there are no changes, we have to check the transaction_id on the primary
+    # before waiting for the next transaction id
+
+    # TODO: Could possibly change __local_rpc__ to also return the transaction_id
+    # Would still need to roughly wait the same time with replication though
+    # making this slightly more chatty.
+
+    primary_transaction_id = rpc(:primary, __MODULE__, :get_transaction_id, [])
+    if primary_transaction_id != local_transaction_id do
+      wait_for_next_transaction_id(local_transaction_id, System.monotonic_time(), timeout, 0)
+    end
+    result
+  end
+
+  def get_transaction_id() do
+    position_file = get(@ets_key_position_file)
+    [ transaction_id, _transaction_hash] = File.read!(position_file) |> String.trim |> String.split("/")
+    # If this is unparsable, something bad happenned and just crash.
+    { transaction_number, "" } = Integer.parse(transaction_id, 16)
+    transaction_number
+  end
+
+  def wait_for_next_transaction_id(id, start_time, timeout, retry_count) do
+    #Logger.info("Litefs #{Node.self()} - waiting for replication #{id} for #{(System.monotonic_time() - start_time ) / 1_000_000}")
+    cond do
+      (System.monotonic_time() - start_time) / 1_000_000 > timeout ->
+        Logger.error("Litefs #{Node.self()} - replication timed out on #{id}")
+        false
+      get_transaction_id() > id ->
+        true
+      true ->
+        backoff_time = backoff(retry_count)
+        :timer.sleep(backoff_time)
+        wait_for_next_transaction_id(id, start_time, timeout, retry_count + 1)
+    end
+  end
+
+  def backoff(retry_count) do
+    base = 20
+    cap = 1000
+    x = min(cap, base * :math.pow(2, retry_count)) |> round
+    Enum.random(1..min(cap, x))
   end
 
   @doc false

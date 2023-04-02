@@ -104,7 +104,7 @@ defmodule MyApp.Application do
 end
 ```
 
-Sqlite journal mode needs to be changed to :delete as litefs does not support WAL atm.
+Configure the local sqlite repo. 
 
 ``` elixir
 
