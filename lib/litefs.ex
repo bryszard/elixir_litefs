@@ -255,6 +255,7 @@ defmodule Litefs do
   @doc false
   # A "private" function that converts the MFA data into a string for logging.
   def mfa_string(module, func, args) do
+    IO.inspect args
     "#{Atom.to_string(module)}.#{Atom.to_string(func)}/#{length(args)}"
   end
 end
