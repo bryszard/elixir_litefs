@@ -169,19 +169,17 @@ defmodule Litefs do
     receive do
       {^ref, result} ->
         verbose_log(:info, fn ->
-          "RPC RECV response from #{node} to #{Node.self()}: #{mfa_string(module, func, args)}"
+          "RPC RECV response from #{node} to #{Node.self()}: #{mfa_string(module, func, args)} took #{(System.monotonic_time() - start_time ) / 1_000_000}")
         end)
-
-        Logger.info("RPC #{mfa_string(module, func, args)} took #{(System.monotonic_time() - start_time ) / 1_000_000}")
 
         result
     after
       timeout ->
-        verbose_log(:error, fn ->
-          "RPC TIMEOUT from #{node} to #{Node.self}: #{mfa_string(module, func, args)}"
-        end)
+        # verbose_log(:error, fn ->
+        #   "RPC TIMEOUT from #{node} to #{Node.self}: #{mfa_string(module, func, args)}"
+        # end)
 
-        Logger.error("RPC TIMEOUT #{mfa_string(module, func, args)} took #{(System.monotonic_time() - start_time ) / 1_000_000}")
+        Logger.error("RPC TIMEOUT from #{node} to #{Node.self}: #{mfa_string(module, func, args)} took #{(System.monotonic_time() - start_time ) / 1_000_000}")
 
         exit(:timeout)
     end
@@ -255,7 +253,6 @@ defmodule Litefs do
   @doc false
   # A "private" function that converts the MFA data into a string for logging.
   def mfa_string(module, func, args) do
-    IO.inspect args
     "#{Atom.to_string(module)}.#{Atom.to_string(func)}/#{length(args)}"
   end
 end
