@@ -169,7 +169,7 @@ defmodule Litefs do
     receive do
       {^ref, result} ->
         verbose_log(:info, fn ->
-          "RPC RECV response from #{node} to #{Node.self()}: #{mfa_string(module, func, args)} took #{(System.monotonic_time() - start_time ) / 1_000_000}")
+          "RPC RECV response from #{node} to #{Node.self()}: #{mfa_string(module, func, args)} took #{(System.monotonic_time() - start_time ) / 1_000_000}"
         end)
 
         result
