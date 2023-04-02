@@ -139,6 +139,8 @@ defmodule Litefs do
   @doc """
   Executes the function on the remote node and waits for the response.
 
+  Litefs.rpc(:primary, Litefs, :get_transaction_id, [])
+
   Exits after `timeout` milliseconds.
   """
   @spec rpc(node, module, func :: atom(), args :: [any], non_neg_integer()) :: any()
@@ -182,37 +184,45 @@ defmodule Litefs do
 
   def rpc_and_wait(:primary, module, func, args, timeout \\ 5000) do
     primary_node = get_primary!()
-    position_file = get(@ets_key_position_file)
-    transaction_id = get_transaction_id(position_file)
+    local_transaction_id = get_transaction_id()
 
     result = rpc(primary_node, module, func, args)
 
-    # We don't know what the new transaction number should be, but it
-    # whatever it is, it should be incremented.
-    wait_for_next_transaction_id(position_file, transaction_id, System.monotonic_time(), timeout, 0)
+    # It could be the case that we execute a command that results in no changes.
+    # If there are no changes, we have to check the transaction_id on the primary
+    # before waiting for the next transaction id
 
+    # TODO: Could possibly change __local_rpc__ to also return the transaction_id
+    # Would still need to roughly wait the same time with replication though
+    # making this slightly more chatty.
+
+    primary_transaction_id = rpc(:primary, __MODULE__, :get_transaction_id, [])
+    if primary_transaction_id != local_transaction_id do
+      wait_for_next_transaction_id(local_transaction_id, System.monotonic_time(), timeout, 0)
+    end
     result
   end
 
-  def get_transaction_id(position_file) do
+  def get_transaction_id() do
+    position_file = get(@ets_key_position_file)
     [ transaction_id, _transaction_hash] = File.read!(position_file) |> String.trim |> String.split("/")
     # If this is unparsable, something bad happenned and just crash.
     { transaction_number, "" } = Integer.parse(transaction_id, 16)
     transaction_number
   end
 
-  def wait_for_next_transaction_id(position_file, id, start_time, timeout, retry_count) do
-    Logger.info("Litefs #{Node.self()} - waiting for next transaction_id - #{start_time} - #{id}")
+  def wait_for_next_transaction_id(id, start_time, timeout, retry_count) do
+    Logger.info("Litefs #{Node.self()} - waiting for replication #{id} for #{(System.monotonic_time() - start_time ) / 1_000_000}")
     cond do
       (System.monotonic_time() - start_time) / 1_000_000 > timeout ->
-        Logger.error("Litefs #{Node.self()} - replication timed out waiting for next transaction_id")
+        Logger.error("Litefs #{Node.self()} - replication timed out on #{id}")
         false
-      get_transaction_id(position_file) > id ->
+      get_transaction_id() > id ->
         true
       true ->
         backoff_time = backoff(retry_count)
         :timer.sleep(backoff_time)
-        wait_for_next_transaction_id(position_file, id, start_time, timeout, retry_count + 1)
+        wait_for_next_transaction_id(id, start_time, timeout, retry_count + 1)
     end
   end
 

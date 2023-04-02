@@ -382,6 +382,7 @@ defmodule Litefs.Repo do
 
         cond do
           primary_node == Node.self() ->
+            IO.inspect "IN PRIMARY"
             __exec_local__(func, args)
 
           Keyword.get(opts, :await, true) ->
