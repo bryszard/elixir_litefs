@@ -78,6 +78,10 @@ defmodule Litefs do
     end
   end
 
+  def is_primary?() do
+    get_primary!() == Node.self()
+  end
+
   def get_primary!() do
     primary_node = get(@ets_key_primary_node)
     if is_nil(primary_node) do
