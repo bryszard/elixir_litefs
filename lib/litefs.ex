@@ -84,11 +84,18 @@ defmodule Litefs do
 
   def get_primary!() do
     primary_node = get(@ets_key_primary_node)
-    primary_node = if is_nil(primary_node) do
-      Logger.error("Litefs #{Node.self()} - No primary found!")
-      raise "No primary found!"
+    if is_nil(primary_node) do
+      # Try to update the primary once. If still can't find, we log and raise.
+      # update_primary will return :ok if it is not nil
+      case update_primary() do
+        :ok -> get(@ets_key_primary_node)
+        :error ->
+          Logger.error("Litefs #{Node.self()} - No primary found!")
+          raise "No primary found!"
+      end
+    else
+      primary_node
     end
-    primary_node
   end
 
   def update_primary() do
