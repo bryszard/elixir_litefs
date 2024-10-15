@@ -1,6 +1,6 @@
 # Elixir Litefs
 
-**This is a fork of Litefs hosted on Sourcehut** [here](https://git.sr.ht/~sheertj/elixir_litefs)
+**This is a fork of Litefs wrapper hosted on Sourcehut** [here](https://git.sr.ht/~sheertj/elixir_litefs)
 
 When using Sqlite and Litefs with multiple servers, this forwards all write requests to the primary node.
 
@@ -9,7 +9,7 @@ This library is based off of the packages fly_rpc and fly_postgres_elixir.
 ## Installation
 
 ```elixir
-{:litefs, git: "https://git.sr.ht/~sheertj/elixir_litefs" }
+{:litefs, git: "https://github.com/bryszard/elixir_litefs", branch: "main" }
 ```
 
 ## Configuration
