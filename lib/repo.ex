@@ -337,7 +337,7 @@ defmodule Litefs.Repo do
       See `Ecto.Repo.transaction/2` for full documentation.
       """
       def transaction(fun_or_multi, opts \\ []) do
-        unquote(__MODULE__).__exec_on_primary__(:transaction, [fun_or_multi, opts])
+        unquote(__MODULE__).__exec_on_primary__(:transaction, [fun_or_multi, opts], opts)
       end
 
       @doc """
