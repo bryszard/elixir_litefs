@@ -1,48 +1,50 @@
 # Elixir Litefs
 
-When using Sqlite and Litefs with multiple servers, this forwards all write requests to the primary node. 
+**This is a fork of Litefs hosted on Sourcehut** [here](https://git.sr.ht/~sheertj/elixir_litefs)
+
+When using Sqlite and Litefs with multiple servers, this forwards all write requests to the primary node.
 
 This library is based off of the packages fly_rpc and fly_postgres_elixir.
 
 ## Installation
 
-``` elixir
+```elixir
 {:litefs, git: "https://git.sr.ht/~sheertj/elixir_litefs" }
 ```
 
 ## Configuration
 
-  To use it, rename your existing repo module and add a new module with the same
-  name as your original repo like this.
+To use it, rename your existing repo module and add a new module with the same
+name as your original repo like this.
 
-  Original code:
+Original code:
 
-  ```elixir
-  defmodule MyApp.Repo do
-    use Ecto.Repo,
-      otp_app: :my_app,
-      adapter: Ecto.Adapters.SQLite3
-  end
-  ```
+```elixir
+defmodule MyApp.Repo do
+  use Ecto.Repo,
+    otp_app: :my_app,
+    adapter: Ecto.Adapters.SQLite3
+end
+```
 
-  Changes to:
+Changes to:
 
-  ```elixir
-  defmodule MyApp.Repo.Local do
-    use Ecto.Repo,
-      otp_app: :my_app,
-      adapter: Ecto.Adapters.SQLite3
-  end
+```elixir
+defmodule MyApp.Repo.Local do
+  use Ecto.Repo,
+    otp_app: :my_app,
+    adapter: Ecto.Adapters.SQLite3
+end
 
-  defmodule MyApp.Repo do
-    use Litefs.Repo, local_repo: MyApp.Repo.Local
-  end
-  ```
+defmodule MyApp.Repo do
+  use Litefs.Repo, local_repo: MyApp.Repo.Local
+end
+```
 
 The `Litefs.Repo` performs all **read** operations like `all`, `one`, and `get_by`
 directly on the local replica. Other modifying functions like `insert`,
 `update`, and `delete` are performed on the **primary database** through proxy
-calls to a node in your Elixir cluster as identified by `litefs`. 
+calls to a node in your Elixir cluster as identified by `litefs`.
 
 ### Migration Files
 
@@ -76,7 +78,7 @@ With these project plumbing changes, you application code can stay largely untou
 
 ### Application
 
-There are several changes to your application supervision tree. 
+There are several changes to your application supervision tree.
 
 - start the litefs genserver
 - start the renamed local ecto repo
@@ -104,9 +106,9 @@ defmodule MyApp.Application do
 end
 ```
 
-Configure the local sqlite repo. 
+Configure the local sqlite repo.
 
-``` elixir
+```elixir
 
 config :my_app, MyApp.Repo.Local,
   database: "/mnt/litefs1/test.db",
@@ -116,7 +118,6 @@ config :my_app, MyApp.Repo.Local,
 
 ```
 
-
 Libcluster needs to be configured appropriately for dev.exs / runtime.exs.
 
 ```elixir
@@ -125,4 +126,3 @@ config :libcluster,
     local_epmd_example: [
       strategy: Elixir.Cluster.Strategy.LocalEpmd]]
 ```
-
