@@ -337,7 +337,7 @@ defmodule Litefs.Repo do
       See `Ecto.Repo.transaction/2` for full documentation.
       """
       def transaction(fun_or_multi, opts \\ []) do
-        unquote(__MODULE__).__exec_local__(:transaction, [fun_or_multi, opts])
+        unquote(__MODULE__).__exec_on_primary__(:transaction, [fun_or_multi, opts])
       end
 
       @doc """
@@ -376,15 +376,15 @@ defmodule Litefs.Repo do
 
         cond do
           primary_node == Node.self() ->
-            #Logger.debug("__exec_on_primary__ - primary_branch")
+            # Logger.debug("__exec_on_primary__ - primary_branch")
             __exec_local__(func, args)
 
           Keyword.get(opts, :await, true) ->
-            #Logger.debug("__exec_on_primary__ - rpc_and_wait branch")
+            # Logger.debug("__exec_on_primary__ - rpc_and_wait branch")
             Litefs.rpc_and_wait(:primary, @local_repo, func, args)
 
           true ->
-            #Logger.debug("__exec_on_primary__ - rpc_no_wait branch")
+            # Logger.debug("__exec_on_primary__ - rpc_no_wait branch")
             Litefs.rpc(primary_node, @local_repo, func, args)
         end
       end
