@@ -4,7 +4,7 @@ defmodule Litefs.MixProject do
   def project do
     [
       app: :litefs,
-      version: "0.2.0",
+      version: "0.2.1",
       elixir: "~> 1.12",
       start_permanent: Mix.env() == :prod,
       name: "Litefs",
